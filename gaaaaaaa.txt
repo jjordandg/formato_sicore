@@ -1,0 +1,64 @@
+IF FILE("\\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\PERSONAL.dbf") = .t.
+	SET CENTURY ON 
+	CLOSE DATABASES 
+	lcnumero = 0
+	ottemp = PUTFILE("Archivo de Salida:", "sicore", "txt")
+
+	uSE \\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\PERSONAL.DBF INDEX \\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\PERSONAL.CDX SHARED IN 0 ALIAS PERSONAL
+	USE \\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\DBANTI.dbf INDEX \\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\DBANTI.cdx SHARED IN 0 ALIAS DBANTI
+	USE ALLTRIM("\\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\S" + ALLTRIM(THISFORM.txtmes.Value) + ALLTRIM(THISFORM.txtanio.Value) + "2.dbf") INDEX ALLTRIM("\\10.0.0.245\APS\CLIENTES\HSJD\HONORAR\SUE\S" + ALLTRIM(THISFORM.txtmes.Value) + ALLTRIM(THISFORM.txtanio.Value) + "2.cdx") SHARED IN 0 ALIAS dbperiodo
+
+	SELECT dbperiodo
+	GOTO top
+	
+	do while !EOF()
+	
+			
+		IF dbperiodo.mov_codigo != "930"
+			SKIP
+			LOOP
+		ENDIF 
+		
+		IF DELETED() 
+			SKIP
+			LOOP
+		ENDIF 
+		
+		lcpersonal = dbperiodo.mov_legajo
+		SELECT personal
+		SET ORDER TO 1
+		SEEK lcpersonal ORDER 1 IN personal
+		lccompro = personal.per_compro
+		lcfecompro = personal.per_fecomp
+		lccuit = personal.per_cuit
+				
+		SELECT dbperiodo
+		lcselect = "SELECT sum(MOV_TOTAL) as Bruto from dbperiodo where MOV_TIPCOD = 1 and !DELETED() and mov_legajo = lcpersonal into cursor curtmp"
+		&lcselect
+		lcBruto = curtmp.bruto 
+		lcnumero = lcnumero + 1
+		lccadenasic = "0000" + STR(YEAR(DATE()),4,0) + "1" + PADL(lcnumero,5,"0")
+		lcLinea = "01" + lcfecompro + lccompro + "    " + SUBSTR(STR(lcbruto,16,2),1,13) + "," + SUBSTR(STR(lcbruto,16,2),15,2) + "02171161" + SUBSTR(STR(dbperiodo.mov_honor,14,2),1,11) + "," + SUBSTR(STR(dbperiodo.mov_honor,14,2),13,2) + dtoc(thisform.txtfecha.Value) + "010" + SUBSTR(STR(dbperiodo.mov_impo,14,2),1,11)+ "," + SUBSTR(STR(dbperiodo.mov_impo,14,2),13,2) + "  0,00" + "          " + "80" + SUBSTR(lccuit,1,2) + SUBSTR(lccuit,4,8) + SUBSTR(lccuit,13,1) + "         " + STR(lcnumero,14,0)+ lccadenasic 
+
+		STRTOFILE(lcLinea + CHR(13)+CHR(10),ottemp, 1)
+		
+		SELECT dbperiodo
+		SKIP
+		LOOP
+	enddo 
+	
+	cMessageTitle = 'Finalizado'
+			cMessageText = 'El archivo finalizó correctamente.'
+			nDialogType = 0 + 48 + 0
+			MESSAGEBOX(cMessageText, nDialogType, cMessageTitle)		
+			RETURN 
+
+		
+ELSE 
+	cMessageTitle = 'Error'
+			cMessageText = 'No tiene acceso a los archivos de liquidación. Verifique la conexión de red y pruebe nuevamente.'
+			nDialogType = 0 + 16 + 0
+			MESSAGEBOX(cMessageText, nDialogType, cMessageTitle)		
+			RETURN 
+
+ENDIF 
